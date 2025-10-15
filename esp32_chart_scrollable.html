@@ -25,6 +25,21 @@
         const tempData = data.map(row => row.temp);
         const humData = data.map(row => row.hum);
         const relayData = data.map(row => row.relay);
+        if (!chart) {
+          createChart(labels, tempData, humData, relayData);
+        } else {
+          chart.data.labels = labels;
+          chart.data.datasets[0].data = tempData;
+          chart.data.datasets[1].data = humData;
+          chart.data.datasets[2].data = relayData;
+          chart.update();
+           // Lần đầu tải biểu đồ
+          loadDataAndDraw();
+          // ⚡ Hàm này sẽ được MIT App Inventor gọi để cập nhật lại dữ liệu
+  function reloadData() {
+    console.log("Reload dữ liệu từ App Inventor...");
+    loadDataAndDraw();
+  }
 
         const ctx = document.getElementById('espChart').getContext('2d');
         new Chart(ctx, {
