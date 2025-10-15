@@ -1,0 +1,104 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Biểu đồ ESP32</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    canvas {
+      max-width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <h2>Biểu đồ nhiệt độ, độ ẩm và trạng thái relay</h2>
+  <canvas id="espChart"></canvas>
+
+  <script>
+    const apiUrl = "https://script.google.com/macros/s/AKfycbwDtZ_4ifyXudKbncTlX2hAwcUJDYy4HaPtketkvYEjgmcS2wacZD8Tde17s6nsSylL/exec";
+
+    fetch(apiUrl)
+      .then(response => response.json())
+      .then(data => {
+        const labels = data.map(row => new Date(row.time).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" }));
+        const tempData = data.map(row => row.temp);
+        const humData = data.map(row => row.hum);
+        const relayData = data.map(row => row.relay);
+
+        const ctx = document.getElementById('espChart').getContext('2d');
+        new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [
+              {
+                label: 'Nhiệt độ (°C)',
+                data: tempData,
+                borderColor: 'red',
+                fill: false,
+                yAxisID: 'y',
+              },
+              {
+                label: 'Độ ẩm (%)',
+                data: humData,
+                borderColor: 'blue',
+                fill: false,
+                yAxisID: 'y',
+              },
+              {
+                label: 'Relay',
+                data: relayData,
+                borderColor: 'green',
+                stepped: true,
+                fill: false,
+                yAxisID: 'y1',
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            interaction: {
+              mode: 'index',
+              intersect: false,
+            },
+            stacked: false,
+            plugins: {
+              title: {
+                display: true,
+                text: 'Dữ liệu từ ESP32'
+              }
+            },
+            scales: {
+              x: {
+                ticks: {
+                  maxRotation: 90,
+                  minRotation: 45
+                }
+              },
+              y: {
+                type: 'linear',
+                display: true,
+                position: 'left',
+              },
+              y1: {
+                type: 'linear',
+                display: true,
+                position: 'right',
+                grid: {
+                  drawOnChartArea: false,
+                },
+                ticks: {
+                  stepSize: 1,
+                  callback: function(value) {
+                    return value === 1 ? 'ON' : 'OFF';
+                  }
+                }
+              }
+            }
+          }
+        });
+      });
+  </script>
+</body>
+</html>
