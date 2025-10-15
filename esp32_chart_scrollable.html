@@ -1,5 +1,19 @@
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Biểu đồ ESP32</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    canvas {
+      max-width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <h2>Biểu đồ nhiệt độ, độ ẩm và trạng thái relay</h2>
+  <canvas id="espChart"></canvas>
+  <script>
   const apiUrl = "https://script.google.com/macros/s/AKfycbxhPINgsxcHQn12TCW2h6nbAX4HPPB9wGGCFNXvTs6QcKmfwqekvlZIt13troVh2Qcj/exec";
   let chart; // Biến lưu biểu đồ toàn cục
 
@@ -83,4 +97,7 @@
       }
     }
   }, 1000);
-</script>
+  </script>
+</body>
+</html>
+
