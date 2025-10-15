@@ -1,23 +1,48 @@
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  const apiUrl = "https://script.google.com/macros/s/AKfycbxhPINgsxcHQn12TCW2h6nbAX4HPPB9wGGCFNXvTs6QcKmfwqekvlZIt13troVh2Qcj/exec";
+  let chart; // Biến lưu biểu đồ toàn cục
 
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <title>Biểu đồ ESP32</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-    canvas {
-      max-width: 100%;
-    }
-  </style>
-</head>
-<body>
-  <h2>Biểu đồ nhiệt độ, độ ẩm và trạng thái relay</h2>
-  <canvas id="espChart"></canvas>
+  // 🟢 Hàm tạo biểu đồ lần đầu
+  function createChart(labels, tempData, humData, relayData) {
+    const ctx = document.getElementById('espChart').getContext('2d');
+    chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [
+          { label: 'Nhiệt độ (°C)', data: tempData, borderColor: 'red', fill: false, yAxisID: 'y' },
+          { label: 'Độ ẩm (%)', data: humData, borderColor: 'blue', fill: false, yAxisID: 'y' },
+          { label: 'Relay', data: relayData, borderColor: 'green', stepped: true, fill: false, yAxisID: 'y1' }
+        ]
+      },
+      options: {
+        responsive: true,
+        interaction: { mode: 'index', intersect: false },
+        stacked: false,
+        plugins: { title: { display: true, text: 'Dữ liệu từ ESP32' } },
+        scales: {
+          x: { ticks: { maxRotation: 90, minRotation: 45 } },
+          y: { type: 'linear', display: true, position: 'left' },
+          y1: {
+            type: 'linear',
+            display: true,
+            position: 'right',
+            grid: { drawOnChartArea: false },
+            ticks: {
+              stepSize: 1,
+              callback: function(value) {
+                return value === 1 ? 'ON' : 'OFF';
+              }
+            }
+          }
+        }
+      }
+    });
+  }
 
-  <script>
-    const apiUrl = "https://script.google.com/macros/s/AKfycbxhPINgsxcHQn12TCW2h6nbAX4HPPB9wGGCFNXvTs6QcKmfwqekvlZIt13troVh2Qcj/exec";
-
+  // 🟢 Hàm tải và cập nhật dữ liệu
+  function loadDataAndDraw() {
     fetch(apiUrl)
       .then(response => response.json())
       .then(data => {
@@ -25,6 +50,7 @@
         const tempData = data.map(row => row.temp);
         const humData = data.map(row => row.hum);
         const relayData = data.map(row => row.relay);
+
         if (!chart) {
           createChart(labels, tempData, humData, relayData);
         } else {
@@ -33,87 +59,28 @@
           chart.data.datasets[1].data = humData;
           chart.data.datasets[2].data = relayData;
           chart.update();
-           // Lần đầu tải biểu đồ
-          loadDataAndDraw();
-          // ⚡ Hàm này sẽ được MIT App Inventor gọi để cập nhật lại dữ liệu
+        }
+      })
+      .catch(err => console.error("Lỗi tải dữ liệu:", err));
+  }
+
+  // 🟢 Hàm reloadData được App Inventor gọi gián tiếp
   function reloadData() {
     console.log("Reload dữ liệu từ App Inventor...");
     loadDataAndDraw();
   }
 
-        const ctx = document.getElementById('espChart').getContext('2d');
-        new Chart(ctx, {
-          type: 'line',
-          data: {
-            labels: labels,
-            datasets: [
-              {
-                label: 'Nhiệt độ (°C)',
-                data: tempData,
-                borderColor: 'red',
-                fill: false,
-                yAxisID: 'y',
-              },
-              {
-                label: 'Độ ẩm (%)',
-                data: humData,
-                borderColor: 'blue',
-                fill: false,
-                yAxisID: 'y',
-              },
-              {
-                label: 'Relay',
-                data: relayData,
-                borderColor: 'green',
-                stepped: true,
-                fill: false,
-                yAxisID: 'y1',
-              }
-            ]
-          },
-          options: {
-            responsive: true,
-            interaction: {
-              mode: 'index',
-              intersect: false,
-            },
-            stacked: false,
-            plugins: {
-              title: {
-                display: true,
-                text: 'Dữ liệu từ ESP32'
-              }
-            },
-            scales: {
-              x: {
-                ticks: {
-                  maxRotation: 90,
-                  minRotation: 45
-                }
-              },
-              y: {
-                type: 'linear',
-                display: true,
-                position: 'left',
-              },
-              y1: {
-                type: 'linear',
-                display: true,
-                position: 'right',
-                grid: {
-                  drawOnChartArea: false,
-                },
-                ticks: {
-                  stepSize: 1,
-                  callback: function(value) {
-                    return value === 1 ? 'ON' : 'OFF';
-                  }
-                }
-              }
-            }
-          }
-        });
-      });
-  </script>
-</body>
-</html>
+  // ⚡ Gọi lần đầu để hiển thị biểu đồ
+  loadDataAndDraw();
+
+  // 🟢 Theo dõi WebViewString để nhận lệnh "reloadData"
+  setInterval(() => {
+    if (window.AppInventor) {
+      const cmd = window.AppInventor.getWebViewString();
+      if (cmd === "reloadData") {
+        reloadData();
+        window.AppInventor.setWebViewString(""); // Xóa sau khi xử lý
+      }
+    }
+  }, 1000);
+</script>
