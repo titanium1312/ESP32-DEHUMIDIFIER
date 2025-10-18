@@ -131,7 +131,7 @@
       const data = await response.json();
 
       // chỉ lấy 100 mẫu cuối để mượt hơn
-      const latest = data.slice(-100);
+      const latest = data.slice(-50);
       const labels = latest.map(r => new Date(r.time));
       const tempData = latest.map(r => r.temp);
       const humData = latest.map(r => r.hum);
@@ -177,3 +177,4 @@
   </script>
 </body>
 </html>
+
