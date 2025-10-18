@@ -18,7 +18,8 @@
       width: 100%;
       height: calc(100% - 60px);
       padding: 10px;
-      box-sizing: border-box;
+      overflow-x: auto; // mới 18/10
+      //box-sizing: border-box;
     }
     #controlPanel {
       display: flex;
@@ -53,7 +54,8 @@
 </head>
 <body>
   <h2>Biểu đồ nhiệt độ, độ ẩm và trạng thái relay</h2>
-
+  <div id="chartContainer">
+    <canvas id="espChart"></canvas>
   <!-- Bộ lọc thời gian -->
   <div style="margin-bottom: 10px;">
     <label>Từ ngày:</label>
@@ -67,8 +69,6 @@
     <button onclick="applyFilter()">Lọc dữ liệu</button>
     <button onclick="resetFilter()">Hiển thị tất cả</button>
   </div>
-
-  <canvas id="espChart"></canvas>
 
   <script>
   const apiUrl = "https://script.google.com/macros/s/AKfycbxhPINgsxcHQn12TCW2h6nbAX4HPPB9wGGCFNXvTs6QcKmfwqekvlZIt13troVh2Qcj/exec";
@@ -186,4 +186,5 @@
   </script>
 </body>
 </html>
+
 
