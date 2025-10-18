@@ -52,94 +52,56 @@
   </style>
 </head>
 <body>
-  <div id="controlPanel">
-    <label>Từ:</label>
+  <h2>Biểu đồ nhiệt độ, độ ẩm và trạng thái relay</h2>
+
+  <!-- Bộ lọc thời gian -->
+  <div style="margin-bottom: 10px;">
+    <label>Từ ngày:</label>
+    <input type="date" id="startDate">
+    <label>Đến ngày:</label>
+    <input type="date" id="endDate">
+    <label>Từ giờ:</label>
     <input type="time" id="startTime" value="00:00">
-    <label>Đến:</label>
+    <label>Đến giờ:</label>
     <input type="time" id="endTime" value="23:59">
-    <button onclick="filterByTime()">Xem dữ liệu</button>
-    <button onclick="reloadData()">🔄 Làm mới</button>
+    <button onclick="applyFilter()">Lọc dữ liệu</button>
+    <button onclick="resetFilter()">Hiển thị tất cả</button>
   </div>
 
-  <div id="chartContainer">
-    <div id="status">🔄 Đang tải dữ liệu...</div>
-    <canvas id="espChart"></canvas>
-  </div>
+  <canvas id="espChart"></canvas>
 
   <script>
   const apiUrl = "https://script.google.com/macros/s/AKfycbxhPINgsxcHQn12TCW2h6nbAX4HPPB9wGGCFNXvTs6QcKmfwqekvlZIt13troVh2Qcj/exec";
-  let chart, allData = [];
+  let chart;
+  let allData = []; // Lưu toàn bộ dữ liệu gốc
 
   function createChart(labels, tempData, humData, relayData) {
     const ctx = document.getElementById('espChart').getContext('2d');
-    if (chart) chart.destroy();
     chart = new Chart(ctx, {
       type: 'line',
       data: {
-        labels,
+        labels: labels,
         datasets: [
-          {
-            label: '🌡️ Nhiệt độ (°C)',
-            data: tempData,
-            borderColor: '#ff5252',
-            backgroundColor: 'rgba(255,82,82,0.2)',
-            fill: true,
-            tension: 0.3,
-            yAxisID: 'y'
-          },
-          {
-            label: '💧 Độ ẩm (%)',
-            data: humData,
-            borderColor: '#42a5f5',
-            backgroundColor: 'rgba(66,165,245,0.2)',
-            fill: true,
-            tension: 0.3,
-            yAxisID: 'y'
-          },
-          {
-            label: '⚡ Relay',
-            data: relayData,
-            borderColor: '#00e676',
-            borderWidth: 2,
-            stepped: true,
-            pointRadius: 3,
-            fill: false,
-            yAxisID: 'y1'
-          }
+          { label: 'Nhiệt độ (°C)', data: tempData, borderColor: 'red', fill: false, yAxisID: 'y' },
+          { label: 'Độ ẩm (%)', data: humData, borderColor: 'blue', fill: false, yAxisID: 'y' },
+          { label: 'Relay', data: relayData, borderColor: 'green', stepped: true, fill: false, yAxisID: 'y1' }
         ]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        animation: false,
         interaction: { mode: 'index', intersect: false },
-        plugins: {
-          legend: { position: 'bottom', labels: { color: '#ddd' } }
-        },
+        stacked: false,
+        plugins: { title: { display: true, text: 'Dữ liệu từ ESP32' } },
         scales: {
-          x: {
-            ticks: {
-              color: '#aaa',
-              maxRotation: 0,
-              autoSkip: true,
-              maxTicksLimit: 10,
-              callback: (v, i) => {
-                const date = new Date(labels[i]);
-                return date.toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit' });
-              }
-            },
-            grid: { color: '#333' }
-          },
-          y: {
-            title: { display: true, text: '°C / %', color: '#ccc' },
-            ticks: { color: '#aaa' },
-            grid: { color: '#333' }
-          },
+          x: { ticks: { maxRotation: 90, minRotation: 45 } },
+          y: { type: 'linear', display: true, position: 'left' },
           y1: {
+            type: 'linear',
+            display: true,
             position: 'right',
             grid: { drawOnChartArea: false },
             ticks: {
-              color: '#aaa',
               stepSize: 1,
               callback: v => v === 1 ? 'ON' : 'OFF'
             }
@@ -149,52 +111,69 @@
     });
   }
 
-  async function loadDataAndDraw() {
-    try {
-      document.getElementById("status").innerText = "🔄 Đang tải dữ liệu...";
-      const res = await fetch(apiUrl);
-      const data = await res.json();
-      allData = data; // lưu tất cả để lọc sau
-      filterByTime(); // vẽ theo khoảng giờ mặc định
-      document.getElementById("status").innerText = "✅ Dữ liệu cập nhật: " + new Date().toLocaleTimeString("vi-VN");
-    } catch (e) {
-      document.getElementById("status").innerText = "⚠️ Lỗi tải dữ liệu!";
-      console.error(e);
+  function loadDataAndDraw() {
+    fetch(apiUrl)
+      .then(r => r.json())
+      .then(data => {
+        allData = data; // lưu bản gốc
+        updateChart(data);
+      })
+      .catch(err => console.error("Lỗi tải dữ liệu:", err));
+  }
+
+  function updateChart(data) {
+    const labels = data.map(row => new Date(row.time).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" }));
+    const tempData = data.map(row => row.temp);
+    const humData = data.map(row => row.hum);
+    const relayData = data.map(row => row.relay);
+
+    if (!chart) createChart(labels, tempData, humData, relayData);
+    else {
+      chart.data.labels = labels;
+      chart.data.datasets[0].data = tempData;
+      chart.data.datasets[1].data = humData;
+      chart.data.datasets[2].data = relayData;
+      chart.update();
     }
   }
 
-  function filterByTime() {
-    if (!allData.length) return;
-    const start = document.getElementById("startTime").value;
-    const end = document.getElementById("endTime").value;
+  // 🔍 Lọc theo ngày + giờ
+  function applyFilter() {
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+    const startTime = document.getElementById('startTime').value;
+    const endTime = document.getElementById('endTime').value;
 
-    const [sh, sm] = start.split(":").map(Number);
-    const [eh, em] = end.split(":").map(Number);
+    if (!startDate || !endDate) {
+      alert("Vui lòng chọn ngày bắt đầu và kết thúc!");
+      return;
+    }
 
-    const startMs = sh * 60 + sm;
-    const endMs = eh * 60 + em;
+    const start = new Date(`${startDate}T${startTime}`);
+    const end = new Date(`${endDate}T${endTime}`);
 
-    // lọc theo giờ trong ngày (giả định dữ liệu hôm nay)
-    const filtered = allData.filter(r => {
-      const t = new Date(r.time);
-      const total = t.getHours() * 60 + t.getMinutes();
-      return total >= startMs && total <= endMs;
+    const filtered = allData.filter(row => {
+      const t = new Date(row.time);
+      return t >= start && t <= end;
     });
 
-    const latest = filtered.slice(-200); // tránh lag
-    const labels = latest.map(r => new Date(r.time));
-    const temp = latest.map(r => r.temp);
-    const hum = latest.map(r => r.hum);
-    const relay = latest.map(r => r.relay);
-
-    createChart(labels, temp, hum, relay);
+    updateChart(filtered);
   }
 
+  // 🔁 Hiển thị lại toàn bộ
+  function resetFilter() {
+    updateChart(allData);
+  }
+
+  // 🔄 Cho App Inventor gọi
   function reloadData() {
+    console.log("Reload dữ liệu từ App Inventor...");
     loadDataAndDraw();
   }
 
-  // Khi App Inventor gửi reloadData
+  loadDataAndDraw();
+
+  // Theo dõi WebViewString
   setInterval(() => {
     if (window.AppInventor) {
       const cmd = window.AppInventor.getWebViewString();
@@ -203,9 +182,8 @@
         window.AppInventor.setWebViewString("");
       }
     }
-  }, 3000);
-
-  loadDataAndDraw();
+  }, 1000);
   </script>
 </body>
 </html>
+
