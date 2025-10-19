@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>ESP32 Chart - Theo giờ</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background-color: #121212;
+      color: #fff;
+      font-family: Arial, sans-serif;
+      overflow: hidden;
+    }
+    #chartContainer {
+      width: 100%;
+      height: calc(100% - 60px);
+      padding: 10px;
+      box-sizing: border-box;
+    }
+    #chartWrapper {
+      width: 100%;
+      height: 100%;
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
+    #espChart {
+      min-width: 1500px; /* 👈 Điều chỉnh độ rộng để cuộn ngang */
+      height: 100%;
+    }
+    #controlPanel {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      padding: 10px;
+      background: #1e1e1e;
+      flex-wrap: wrap;
+    }
+    input, button {
+      background: #2a2a2a;
+      color: #fff;
+      border: 1px solid #444;
+      padding: 5px 8px;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    button:hover {
+      background: #333;
+    }
+    h2 {
+      text-align: center;
+      margin: 10px 0;
+    }
+  </style>
+</head>
+<body>
+  <h2>Biểu đồ nhiệt độ, độ ẩm và trạng thái relay</h2>
+
+  <div id="chartContainer">
+    <div id="chartWrapper">
+      <canvas id="espChart"></canvas>
+    </div>
+  </div>
+
+  <div id="controlPanel">
+    <label>Từ ngày:</label>
+    <input type="date" id="startDate">
+    <label>Đến ngày:</label>
+    <input type="date" id="endDate">
+    <label>Từ giờ:</label>
+    <input type="time" id="startTime" value="00:00">
+    <label>Đến giờ:</label>
+    <input type="time" id="endTime" value="23:59">
+    <button onclick="applyFilter()">Lọc dữ liệu</button>
+    <button onclick="resetFilter()">Hiển thị tất cả</button>
+  </div>
+
+  <script>
+    const apiUrl = "https://script.google.com/macros/s/AKfycbxhPINgsxcHQn12TCW2h6nbAX4HPPB9wGGCFNXvTs6QcKmfwqekvlZIt13troVh2Qcj/exec";
+    let chart;
+    let allData = [];
+
+    function createChart(labels, tempData, humData, relayData) {
+      const ctx = document.getElementById('espChart').getContext('2d');
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            { label: 'Nhiệt độ (°C)', data: tempData, borderColor: 'red', fill: false, yAxisID: 'y' },
+            { label: 'Độ ẩm (%)', data: humData, borderColor: 'blue', fill: false, yAxisID: 'y' },
+            { label: 'Relay', data: relayData, borderColor: 'green', stepped: true, fill: false, yAxisID: 'y1' }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          stacked: false,
+          plugins: { title: { display: true, text: 'Dữ liệu từ ESP32' } },
+          scales: {
+            x: {
+              ticks: { maxRotation: 90, minRotation: 45 },
+              title: { display: true, text: 'Thời gian' }
+            },
+            y: {
+              type: 'linear',
+              display: true,
+              position: 'left',
+              title: { display: true, text: 'Nhiệt độ / Độ ẩm' }
+            },
+            y1: {
+              type: 'linear',
+              display: true,
+              position: 'right',
+              grid: { drawOnChartArea: false },
+              ticks: {
+                stepSize: 1,
+                callback: v => v === 1 ? 'ON' : 'OFF'
+              },
+              title: { display: true, text: 'Relay' }
+            }
+          }
+        }
+      });
+    }
+
+    function updateChart(data) {
+      if (!Array.isArray(data) || data.length === 0) {
+        alert("Không có dữ liệu để hiển thị.");
+        return;
+      }
+
+      const labels = data.map(row => new Date(row.time).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" }));
+      const tempData = data.map(row => row.temp);
+      const humData = data.map(row => row.hum);
+      const relayData = data.map(row => {
+        if (row.relay === "ON") return 1;
+        if (row.relay === "OFF") return 0;
+        return row.relay;
+      });
+
+      if (!chart) createChart(labels, tempData, humData, relayData);
+      else {
+        chart.data.labels = labels;
+        chart.data.datasets[0].data = tempData;
+        chart.data.datasets[1].data = humData;
+        chart.data.datasets[2].data = relayData;
+        chart.update();
+      }
+    }
+
+    function loadDataAndDraw() {
+      fetch(apiUrl)
+        .then(r => r.json())
+        .then(data => {
+          if (!Array.isArray(data)) {
+            console.error("Dữ liệu không hợp lệ:", data);
+            return;
+          }
+          allData = data;
+          updateChart(data);
+        })
+        .catch(err => {
+          console.error("Lỗi tải dữ liệu:", err);
+          alert("Không thể tải dữ liệu từ máy chủ.");
+        });
+    }
+
+    function applyFilter() {
+      const startDate = document.getElementById('startDate').value;
+      const endDate = document.getElementById('endDate').value;
+      const startTime = document.getElementById('startTime').value;
+      const endTime = document.getElementById('endTime').value;
+
+      if (!startDate || !endDate) {
+        alert("Vui lòng chọn ngày bắt đầu và kết thúc!");
+        return;
+      }
+
+      const start = new Date(`${startDate}T${startTime}`);
+      const end = new Date(`${endDate}T${endTime}`);
+
+      const filtered = allData.filter(row => {
+        const t = new Date(row.time);
+        return t >= start && t <= end;
+      });
+
+      if (filtered.length === 0) {
+        alert("Không có dữ liệu trong khoảng thời gian đã chọn.");
+        return;
+      }
+
+      updateChart(filtered);
+    }
+
+    function resetFilter() {
+      updateChart(allData);
+    }
+
+    function reloadData() {
+      console.log("Reload dữ liệu từ App Inventor...");
+      loadDataAndDraw();
+    }
+
+    loadDataAndDraw();
+
+    setInterval(() => {
+      if (window.AppInventor) {
+        const cmd = window.AppInventor.getWebViewString();
+        if (cmd === "reloadData") {
+          reloadData();
+          window.AppInventor.setWebViewString("");
+        }
+      }
+    }, 1000);
+  </script>
+</body>
+</html>
